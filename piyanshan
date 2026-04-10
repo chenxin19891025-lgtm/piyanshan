@@ -1,437 +1,442 @@
-import React, { useState, useRef } from 'react';
-import { 
-  Utensils, BedDouble, Navigation, MapPin, ShoppingBag, Music,
-  ArrowLeft, UploadCloud, Sparkles, Wand2, CheckCircle2,
-  Image as ImageIcon, Loader2, Camera, Flame, Droplets, Leaf
-} from 'lucide-react';
-
-// --- Reusable UI Components ---
-
-const ImagePlaceholder = ({ text, className = "h-64", gradient = "from-slate-100 to-slate-50", textColor="text-slate-400" }) => (
-  <div className={`flex items-center justify-center bg-gradient-to-br ${gradient} ${textColor} font-medium border border-slate-100 rounded-3xl shadow-inner p-6 text-center ${className}`}>
-     <span className="tracking-wide text-sm">[图片: {text}]</span>
-  </div>
-);
-
-// --- AI Dress-up Application ---
-
-const AIDressUp = () => {
-  const [uploadedImage, setUploadedImage] = useState(null);
-  const [generatedImage, setGeneratedImage] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState(null);
-  const fileInputRef = useRef(null);
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUploadedImage(reader.result);
-      setGeneratedImage(null);
-      setError(null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const callAPIWithRetry = async (url, options, retries = 5) => {
-    let delay = 1000;
-    for (let i = 0; i < retries; i++) {
-      try {
-        const response = await fetch(url, options);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return await response.json();
-      } catch (err) {
-        if (i === retries - 1) throw err;
-        await new Promise(res => setTimeout(res, delay));
-        delay *= 2;
-      }
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!uploadedImage) return;
-    setIsGenerating(true);
-    setError(null);
-    
-    try {
-      const apiKey = ""; // System provides key at runtime
-      const base64Data = uploadedImage.split(',')[1];
-      // Note: We use image-to-image prompt to preserve the person while changing clothes
-      const promptText = "请将照片中人物的衣服换成高级美丽的朝鲜族传统服饰（韩服），请保持人物的面部特征和背景基本不变，服饰颜色优雅。";
-      
-      const payload = {
-        contents: [{
-          parts: [
-            { text: promptText },
-            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
-          ]
-        }],
-        generationConfig: {
-          responseModalities: ["IMAGE"]
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>琵岩山“泉韵民俗·森野食光”文旅官网</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: {} }
         }
-      };
-
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
-      const data = await callAPIWithRetry(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const outputBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-      
-      if (outputBase64) {
-        setGeneratedImage(`data:image/jpeg;base64,${outputBase64}`);
-      } else {
-        setError("生成失败，请换一张清晰的正面照重试。");
-      }
-    } catch (err) {
-      console.error(err);
-      setError("网络请求遇到问题，请稍后重试。");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-3xl p-6 md:p-10 shadow-sm border border-slate-100">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-600"><Wand2 className="w-6 h-6" /></div>
-        <h3 className="text-2xl font-bold text-slate-800 tracking-wide">AI 智能朝鲜族换装</h3>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-10">
-        {/* Left: Upload Section */}
-        <div className="flex flex-col">
-          <label className="text-sm font-bold text-slate-700 mb-4 tracking-wider">上传您的照片</label>
-          <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-1 bg-slate-50 hover:bg-slate-100 transition-colors border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 cursor-pointer min-h-[300px] relative overflow-hidden"
-          >
-            {uploadedImage ? (
-              <img src={uploadedImage} alt="Uploaded" className="absolute inset-0 w-full h-full object-cover opacity-60" />
-            ) : (
-              <>
-                <UploadCloud className="w-12 h-12 text-slate-300 mb-4" />
-                <p className="text-slate-600 font-medium mb-1">点击上传正面照片</p>
-                <p className="text-xs text-slate-400">支持 JPG, PNG 格式</p>
-              </>
-            )}
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleImageUpload} 
-              className="hidden" 
-              ref={fileInputRef} 
-            />
-          </div>
-          {uploadedImage && (
-            <button onClick={() => fileInputRef.current?.click()} className="mt-4 text-sm text-emerald-600 font-medium hover:underline text-center">
-              重新选择照片
-            </button>
-          )}
-        </div>
-
-        {/* Right: Result Section */}
-        <div className="flex flex-col">
-          <label className="text-sm font-bold text-slate-700 mb-4 tracking-wider">AI 生成结果</label>
-          <div className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
-            {isGenerating ? (
-              <div className="flex flex-col items-center">
-                <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
-                <p className="text-sm text-slate-500">AI 正在为您穿上精美韩服...</p>
-              </div>
-            ) : generatedImage ? (
-              <img src={generatedImage} alt="Generated" className="absolute inset-0 w-full h-full object-cover" />
-            ) : error ? (
-              <div className="text-rose-500 text-sm p-4 text-center">{error}</div>
-            ) : (
-              <div className="text-slate-300 flex flex-col items-center">
-                <ImageIcon className="w-12 h-12 mb-4 opacity-50" />
-                <p className="text-sm">等待生成...</p>
-              </div>
-            )}
-          </div>
-
-          <button 
-            onClick={handleGenerate} 
-            disabled={!uploadedImage || isGenerating}
-            className={`mt-6 w-full py-4 rounded-xl font-bold flex justify-center items-center gap-2 transition-all ${!uploadedImage || isGenerating ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-800 text-white hover:bg-slate-900 shadow-xl shadow-slate-900/10'}`}
-          >
-            <Sparkles className="w-5 h-5" /> 
-            {isGenerating ? '生成中...' : '一键生成 AI 写真'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Page Views ---
-
-const ViewEat = () => (
-  <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-500">
-    <div className="grid md:grid-cols-2 gap-10 items-center">
-      <ImagePlaceholder text="菜棚内的正宗辣白菜火锅" className="h-[400px]" />
-      <div>
-        <h3 className="text-3xl font-extrabold text-slate-800 mb-4">琵岩山菜棚火锅</h3>
-        <p className="text-slate-600 mb-8 leading-relaxed">从田间到餐桌的零距离鲜食体验。在开放式的田园菜棚中，江风拂面，享受最新鲜的食材与最地道的朝鲜族风味。</p>
-        <ul className="space-y-4">
-          <li className="flex items-center gap-3"><CheckCircle2 className="text-emerald-500 w-5 h-5"/> <span className="text-slate-700 font-medium">生态菜园现摘生菜、桔梗</span></li>
-          <li className="flex items-center gap-3"><CheckCircle2 className="text-emerald-500 w-5 h-5"/> <span className="text-slate-700 font-medium">正宗辣白菜火锅底料</span></li>
-          <li className="flex items-center gap-3"><CheckCircle2 className="text-emerald-500 w-5 h-5"/> <span className="text-slate-700 font-medium">温泉菌菇养生特色锅</span></li>
-        </ul>
-      </div>
-    </div>
-    <div className="grid md:grid-cols-2 gap-10 items-center flex-col-reverse md:flex-row-reverse">
-      <ImagePlaceholder text="溪流边的五花肉烧烤" className="h-[400px]" />
-      <div>
-        <h3 className="text-3xl font-extrabold text-slate-800 mb-4">沉浸式溪流烧烤</h3>
-        <p className="text-slate-600 mb-8 leading-relaxed">逐水而食，伴山而栖。依托琵岩山自然溪流，打造天然石滩烧烤区，让您在品尝滋滋作响的美食时找回生活的松弛感。</p>
-        <div className="bg-slate-50 p-6 rounded-2xl">
-          <div className="flex items-center gap-3 mb-2"><Flame className="text-orange-500 w-5 h-5" /><h4 className="font-bold text-slate-800">特色烤品</h4></div>
-          <p className="text-sm text-slate-500 pl-8">烤五花肉、风味独特的烤明太鱼与本地特产烤苹果梨。</p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const ViewSleep = () => (
-  <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-500">
-    <div className="text-center max-w-2xl mx-auto mb-12">
-      <h3 className="text-3xl font-extrabold text-slate-800 mb-4">琵岩山私汤民宿</h3>
-      <p className="text-slate-600 leading-relaxed">长白山余脉的康养秘境。将自然引入室内，独享天然高氟偏硅酸理疗温泉，让身心在静谧的山林间彻底放松。</p>
-    </div>
-    <div className="grid md:grid-cols-3 gap-6">
-      <div className="col-span-2">
-        <ImagePlaceholder text="带有独立泡池的高端民宿外观" className="h-[300px]" />
-      </div>
-      <div>
-        <ImagePlaceholder text="民宿内部温馨陈设" className="h-[300px]" />
-      </div>
-    </div>
-    <div className="grid sm:grid-cols-3 gap-8">
-      <div className="bg-white p-6 border border-slate-100 shadow-sm rounded-2xl text-center">
-        <Droplets className="w-8 h-8 text-blue-500 mx-auto mb-3" />
-        <h4 className="font-bold text-slate-800 mb-2">私汤入户</h4>
-        <p className="text-xs text-slate-500">21栋独栋建筑，每户均配备独立温泉泡池。</p>
-      </div>
-      <div className="bg-white p-6 border border-slate-100 shadow-sm rounded-2xl text-center">
-        <BedDouble className="w-8 h-8 text-blue-500 mx-auto mb-3" />
-        <h4 className="font-bold text-slate-800 mb-2">适老设施</h4>
-        <p className="text-xs text-slate-500">无障碍设计与防滑处理，全面保障长者安全。</p>
-      </div>
-      <div className="bg-white p-6 border border-slate-100 shadow-sm rounded-2xl text-center">
-        <Leaf className="w-8 h-8 text-blue-500 mx-auto mb-3" />
-        <h4 className="font-bold text-slate-800 mb-2">管家服务</h4>
-        <p className="text-xs text-slate-500">提供 24 小时贴心管家与定制温泉药膳服务。</p>
-      </div>
-    </div>
-  </div>
-);
-
-const ViewTravel = () => (
-  <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-500">
-    <div className="grid md:grid-cols-2 gap-10 items-center">
-      <div>
-        <h3 className="text-3xl font-extrabold text-slate-800 mb-4">森林康养步道</h3>
-        <p className="text-slate-600 mb-8 leading-relaxed">沿着依山而建的步道漫步，穿梭于苍翠的树林之间。这里是天然的森林氧吧，每一次呼吸都能感受到大自然的纯净馈赠。</p>
-        <ul className="space-y-4">
-          <li className="flex items-center gap-3"><CheckCircle2 className="text-emerald-500 w-5 h-5"/> <span className="text-slate-700 font-medium">高负氧离子呼吸区</span></li>
-          <li className="flex items-center gap-3"><CheckCircle2 className="text-emerald-500 w-5 h-5"/> <span className="text-slate-700 font-medium">全线平缓适老防滑设计</span></li>
-          <li className="flex items-center gap-3"><CheckCircle2 className="text-emerald-500 w-5 h-5"/> <span className="text-slate-700 font-medium">沿途多处生态观景台</span></li>
-        </ul>
-      </div>
-      <ImagePlaceholder text="苍翠的森林步道与观景台" className="h-[400px]" />
-    </div>
-  </div>
-);
-
-const ViewTour = () => (
-  <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-500">
-    <div className="grid md:grid-cols-2 gap-10 items-center">
-      <ImagePlaceholder text="溶洞温泉实景" className="h-[400px]" />
-      <div>
-        <h3 className="text-3xl font-extrabold text-slate-800 mb-4">全时温泉秘境</h3>
-        <p className="text-slate-600 mb-6 leading-relaxed">2510米深井直采，51℃天然温泉。设有66个主题汤池。</p>
-        <div className="space-y-3">
-          <div className="bg-slate-50 p-4 rounded-xl">
-            <h5 className="font-bold text-slate-800 mb-1">天然溶洞区</h5>
-            <p className="text-sm text-slate-500">光影交错，感受地心的温暖与梦幻氛围。</p>
-          </div>
-          <div className="bg-slate-50 p-4 rounded-xl">
-            <h5 className="font-bold text-slate-800 mb-1">桃花汤池区</h5>
-            <p className="text-sm text-slate-500">室内四季如春，遍植桃花，营造极致浪漫。</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </script>
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 引入 Babel 使得浏览器可以直接运行 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <div className="grid md:grid-cols-2 gap-10 items-center flex-col-reverse md:flex-row-reverse">
-      <ImagePlaceholder text="青瓦白墙的朝鲜族民居" className="h-[400px]" />
-      <div>
-        <h3 className="text-3xl font-extrabold text-slate-800 mb-4">朝鲜族古村落</h3>
-        <p className="text-slate-600 mb-6 leading-relaxed">活态传承的边境文化博物馆。整合百年老宅，原汁原味还原青瓦白墙、稻草屋顶的传统民居风貌。</p>
-        <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
-           <h4 className="font-bold text-emerald-800 mb-2 flex items-center gap-2"><MapPin className="w-5 h-5" /> 核心打卡点</h4>
-           <p className="text-sm text-emerald-700 leading-relaxed">
-             漫步于古朴的村落街巷，参观民俗展陈馆，体验古法酿酒作坊，感受百年传承的历史厚重感。
-           </p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
+    <style>
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-slideUp { animation: slideUp 0.5s ease-out forwards; }
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800">
+    <div id="root"></div>
 
-const ViewShop = () => (
-  <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-500">
-    <div className="text-center max-w-2xl mx-auto mb-12">
-      <h3 className="text-3xl font-extrabold text-slate-800 mb-4">非遗文创与特色物产</h3>
-      <p className="text-slate-600 leading-relaxed">将独特的边境文化与自然风味带回家。我们提供最地道的朝鲜族美食伴手礼与精美的手工艺品。</p>
-    </div>
-    <div className="grid md:grid-cols-2 gap-8">
-      <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden hover:shadow-lg transition-shadow">
-        <ImagePlaceholder text="制作精美的打糕与辣白菜礼盒" className="h-[250px] rounded-none border-0" />
-        <div className="p-8">
-          <h4 className="text-xl font-bold text-slate-800 mb-2">地道民俗美食</h4>
-          <p className="text-slate-500 text-sm mb-4">纯手工制作的朝鲜族打糕、百年配方腌制的辣白菜、以及特色延边米酒。</p>
-          <button className="text-emerald-600 font-bold text-sm hover:underline">查看全部美食 →</button>
-        </div>
-      </div>
-      <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden hover:shadow-lg transition-shadow">
-        <ImagePlaceholder text="朝鲜族非遗手工纪念品" className="h-[250px] rounded-none border-0" />
-        <div className="p-8">
-          <h4 className="text-xl font-bold text-slate-800 mb-2">非遗手作工坊</h4>
-          <p className="text-slate-500 text-sm mb-4">民俗传承人亲手打造的工艺品、传统服饰配饰及琵岩山专属文化纪念品。</p>
-          <button className="text-emerald-600 font-bold text-sm hover:underline">查看文创周边 →</button>
-        </div>
-      </div>
-    </div>
-  </div>
-);
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-const ViewEntertain = () => (
-  <div className="space-y-16 animate-in fade-in slide-in-from-bottom-8 duration-500">
-    <AIDressUp />
-    
-    <div className="grid md:grid-cols-2 gap-8">
-      <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
-        <Music className="w-8 h-8 text-emerald-500 mb-4" />
-        <h4 className="text-xl font-bold text-slate-800 mb-3">民俗演艺互动</h4>
-        <p className="text-slate-600 text-sm leading-relaxed mb-6">欣赏专业的农乐舞、长鼓舞表演，游客更可亲身参与花甲礼、传统婚礼等仪式，沉浸式体验传统礼仪。</p>
-        <ImagePlaceholder text="热烈的长鼓舞表演" className="h-[180px]" />
-      </div>
-      <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
-        <Flame className="w-8 h-8 text-emerald-500 mb-4" />
-        <h4 className="text-xl font-bold text-slate-800 mb-3">星空篝火晚会</h4>
-        <p className="text-slate-600 text-sm leading-relaxed mb-6">夜幕降临，在森林与星空下点燃篝火，伴随现场民谣与传统鼓乐，与亲友共享欢乐的夜间派对时光。</p>
-        <ImagePlaceholder text="星空下的篝火晚会" className="h-[180px]" />
-      </div>
-    </div>
-  </div>
-);
+        // --- 精简版 SVG 图标组件 (替代外部库，确保单文件完美运行) ---
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const icons = {
+                MapPin: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></>,
+                ChevronRight: <polyline points="9 18 15 12 9 6"></polyline>,
+                X: <><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>,
+                CheckCircle2: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></>,
+                Calendar: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></>,
+                Info: <><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></>,
+                Wand2: <><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"></path><path d="m14 7 3 3"></path><path d="M5 6v4"></path><path d="M19 14v4"></path><path d="M10 2v2"></path><path d="M7 8H3"></path><path d="M21 16h-4"></path><path d="M11 3H9"></path></>,
+                Camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></>,
+                Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></>,
+                TreePine: <><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.8 1.7H17Z"></path><path d="M12 22v-3"></path></>,
+                Tent: <><path d="M19 20 10 4"></path><path d="m5 20 9-16"></path><path d="M3 20h18"></path><path d="m12 15-3 5"></path><path d="m12 15 3 5"></path></>,
+                UtensilsCrossed: <><path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"></path><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"></path><path d="m2.1 21.8 6.4-6.3"></path><path d="m19 5-7 7"></path></>,
+                Users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>,
+                Heart: <><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></>,
+                Leaf: <><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></>,
+                Sun: <><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></>,
+                CloudRain: <><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M16 14v6"></path><path d="M8 14v6"></path><path d="M12 16v6"></path></>,
+                Snowflake: <><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line><path d="m20 16-4-4 4-4"></path><path d="m4 8 4 4-4 4"></path><path d="m16 4-4 4-4-4"></path><path d="m8 20 4-4 4 4"></path></>
+            };
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name]}
+                </svg>
+            );
+        };
 
+        const SparkleIcon = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-emerald-300">
+                <path d="M12 2L14.2426 9.75736L22 12L14.2426 14.2426L12 22L9.75736 14.2426L2 12L9.75736 9.75736L12 2Z" fill="currentColor"/>
+            </svg>
+        );
 
-// --- Main Application Layout ---
-
-export default function App() {
-  // view can be: 'home', 'eat', 'sleep', 'travel', 'tour', 'shop', 'entertain'
-  const [currentView, setCurrentView] = useState('home');
-
-  const categories = [
-    { id: 'eat', name: '吃', subtitle: '森野食光', icon: Utensils, component: <ViewEat /> },
-    { id: 'sleep', name: '住', subtitle: '自然栖居', icon: BedDouble, component: <ViewSleep /> },
-    { id: 'travel', name: '行', subtitle: '步道漫游', icon: Navigation, component: <ViewTravel /> },
-    { id: 'tour', name: '游', subtitle: '泉韵民俗', icon: MapPin, component: <ViewTour /> },
-    { id: 'shop', name: '购', subtitle: '非遗好物', icon: ShoppingBag, component: <ViewShop /> },
-    { id: 'entertain', name: '娱', subtitle: '沉浸互动', icon: Music, component: <ViewEntertain /> },
-  ];
-
-  const currentCategory = categories.find(c => c.id === currentView);
-
-  return (
-    <div className="font-sans text-slate-600 bg-[#FAF9F6] min-h-screen selection:bg-emerald-200 selection:text-emerald-900 flex flex-col">
-      
-      {/* Minimalist Header */}
-      <header className="w-full py-8 px-6 md:px-12 flex justify-between items-center z-10">
-        <div 
-          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={() => setCurrentView('home')}
-        >
-          <Leaf className="w-6 h-6 text-emerald-600" />
-          <span className="text-lg font-bold tracking-widest text-slate-800">琵岩山文旅</span>
-        </div>
-        {currentView !== 'home' && (
-          <button 
-            onClick={() => setCurrentView('home')}
-            className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-2 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> 返回首页
-          </button>
-        )}
-      </header>
-
-      {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-6 md:px-12 pb-20 flex flex-col">
-        
-        {currentView === 'home' ? (
-          /* --- HOME GRID VIEW --- */
-          <div className="flex-1 flex flex-col justify-center animate-in fade-in zoom-in-95 duration-700 pb-10">
-            <div className="text-center mb-16 md:mb-24">
-              <p className="text-xs font-bold tracking-[0.3em] text-emerald-500 uppercase mb-4">Piyan Mountain Tourism</p>
-              <h1 className="text-4xl md:text-6xl font-extrabold text-slate-800 tracking-tight mb-6">
-                泉韵民俗 · 森野食光
-              </h1>
-              <p className="text-slate-500 max-w-xl mx-auto">
-                沉浸式民俗体验 / 全季节康养度假 / 森野烟火美食
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 max-w-4xl mx-auto w-full">
-              {categories.map((cat) => (
-                <button 
-                  key={cat.id}
-                  onClick={() => {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                    setCurrentView(cat.id);
-                  }} 
-                  className="group relative aspect-square md:aspect-auto md:h-56 bg-white border border-slate-100 rounded-[2rem] flex flex-col items-center justify-center gap-4 hover:shadow-2xl hover:shadow-slate-200/50 hover:border-emerald-100 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-emerald-50/0 group-hover:from-emerald-50/50 group-hover:to-transparent transition-colors"></div>
-                  <cat.icon className="w-10 h-10 md:w-12 md:h-12 text-slate-300 group-hover:text-emerald-500 transition-colors duration-300 relative z-10" />
-                  <div className="relative z-10">
-                    <span className="block text-2xl font-bold tracking-widest text-slate-700 group-hover:text-slate-900 transition-colors">{cat.name}</span>
-                    <span className="block text-xs text-slate-400 mt-1 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">{cat.subtitle}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          /* --- DETAIL VIEW --- */
-          <div className="pt-8">
-            <div className="mb-16 border-b border-slate-200 pb-8 flex items-end gap-6">
-               <div className="bg-slate-800 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-900/10">
-                 {currentCategory && <currentCategory.icon className="text-white w-8 h-8" />}
-               </div>
-               <div>
-                 <h2 className="text-4xl font-extrabold text-slate-800">{currentCategory?.name} <span className="text-slate-300 font-normal">|</span> <span className="text-2xl text-slate-500 font-medium">{currentCategory?.subtitle}</span></h2>
-               </div>
-            </div>
+        // --- 核心应用 ---
+        const App = () => {
+            const [activeFeature, setActiveFeature] = useState(0);
+            const [isBookingModalOpen, setBookingModalOpen] = useState(false);
+            const [isInfoModalOpen, setInfoModalOpen] = useState(false);
+            const [toast, setToast] = useState('');
+            const [detailFeature, setDetailFeature] = useState(null);
             
-            <div className="min-h-[50vh]">
-              {currentCategory?.component}
-            </div>
-          </div>
-        )}
-      </main>
+            const [isAIAvatarModalOpen, setAIAvatarModalOpen] = useState(false);
+            const [uploadedImage, setUploadedImage] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [generatedImage, setGeneratedImage] = useState(null);
 
-      {/* Minimalist Footer */}
-      <footer className="w-full py-8 text-center text-xs font-medium text-slate-400 tracking-wider">
-        © {new Date().getFullYear()} 琵岩山文旅产品方案. ALL RIGHTS RESERVED.
-      </footer>
-    </div>
-  );
-}
+            const showToast = (msg) => {
+                setToast(msg);
+                setTimeout(() => setToast(''), 3000);
+            };
+
+            const handleBookingSubmit = (e) => {
+                e.preventDefault();
+                setBookingModalOpen(false);
+                showToast('预订请求已提交成功！客服将尽快与您联系。');
+            };
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => setUploadedImage(event.target.result);
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleGenerateAI = () => {
+                setIsGenerating(true);
+                setTimeout(() => {
+                    setIsGenerating(false);
+                    setGeneratedImage("https://images.unsplash.com/photo-1517154421773-0529f29ea451?auto=format&fit=crop&q=80&w=800");
+                    showToast('DeepSeek 换装生成成功！');
+                }, 3500);
+            };
+
+            const resetAI = () => {
+                setUploadedImage(null);
+                setGeneratedImage(null);
+                setIsGenerating(false);
+            };
+
+            const handleFeatureTabClick = (idx) => {
+                setActiveFeature(idx);
+                if (window.innerWidth < 1024) {
+                    const element = document.getElementById('feature-content-display');
+                    if (element) {
+                        const offset = 80;
+                        const bodyRect = document.body.getBoundingClientRect().top;
+                        const elementRect = element.getBoundingClientRect().top;
+                        window.scrollTo({ top: elementRect - bodyRect - offset, behavior: 'smooth' });
+                    }
+                }
+            };
+
+            // 数据配置
+            const corePillars = [
+                { icon: <Icon name="TreePine" size={32} />, title: "生态康养", desc: "自然栖居，长白山余脉的康养秘境" },
+                { icon: <Icon name="Tent" size={32} />, title: "民俗体验", desc: "文化沉浸，活态传承的边境文化博物馆" },
+                { icon: <Icon name="UtensilsCrossed" size={32} />, title: "森野美食", desc: "舌尖之旅，从田间到餐桌的烟火食趣" }
+            ];
+
+            const features = [
+                {
+                    title: "琵岩山温泉秘境", subtitle: "长白山余脉的康养秘境，依山而建", image: "https://images.unsplash.com/photo-1544365558-35aa4afcf11f?auto=format&fit=crop&q=80&w=1000",
+                    tags: ["高氟偏硅酸温泉", "室内溶洞温泉", "桃花主题汤池", "私汤民宿"],
+                    desc: "2510米深井直采，51℃天然碳酸钠型理疗热矿水，富含氟与偏硅酸，结合温泉药膳与森林步道，打造“泡汤+住宿+理疗”闭环。",
+                    details: [
+                        { title: "资源基底", content: "2510米深井直采，51℃天然碳酸钠型理疗热矿水，东北三省独有的稀缺康养资源。" },
+                        { title: "溶洞温泉", content: "天然溶洞光影交错，感受地心温暖与梦幻氛围。" },
+                        { title: "桃花汤池", content: "室内四季如春，遍植桃花，营造极致浪漫。" },
+                        { title: "私汤民宿", content: "独立泡池与私密空间，尊享高端度假体验。" }
+                    ]
+                },
+                {
+                    title: "朝鲜族民俗村", subtitle: "活态传承的边境文化博物馆", image: "https://images.unsplash.com/photo-1517154421773-0529f29ea451?auto=format&fit=crop&q=80&w=1000",
+                    tags: ["百年老宅", "民俗变装", "非遗工坊", "传统歌舞"],
+                    desc: "67%朝鲜族聚居，40+栋传统建筑。提供千余套服饰“一日公主”变装体验，亲手制作打糕、辣白菜，参与传统婚礼，沉浸式感受异域风情。",
+                    details: [
+                        { title: "文化基底", content: "依托龙井市聚居底蕴，整合传统建筑群落，极致还原青瓦白墙、稻草屋顶的传统民居风貌。" },
+                        { title: "民俗变装", content: "提供千余套服饰与妆造服务，化身一日公主/王子，留下最美瞬间。" },
+                        { title: "非遗工坊", content: "大师亲授技艺，亲手制作一份打糕或辣白菜，将独特的文化记忆带回家。" },
+                        { title: "演艺互动", content: "欣赏专业的农乐舞、长鼓舞表演，亲身参与花甲礼、传统婚礼等仪式。" }
+                    ]
+                },
+                {
+                    title: "菜棚火锅", subtitle: "森野田园的烟火食趣，新鲜食材直采", image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=1000",
+                    tags: ["生态采摘", "现摘现煮", "特色锅底", "民俗小吃"],
+                    desc: "从土地到舌尖的0距离鲜食体验。依托生态菜园直采鲜蔬，搭配辣白菜火锅的鲜爽与温泉菌汤的醇厚，在江风拂面中尽享质朴烟火气。",
+                    details: [
+                        { title: "鲜采鲜煮", content: "依托生态菜园，直采生菜、桔梗等鲜蔬；搭配地道朝鲜族肉类，体验田园劳作乐趣。" },
+                        { title: "特色锅底", content: "基础辣白菜锅的鲜爽与温泉菌菇养生锅的醇厚，满足全龄段口味需求。" },
+                        { title: "地道小吃", content: "套餐附赠朝鲜族米酒、打糕、辣炒年糕，体验完整民俗饮食文化。" },
+                        { title: "田园氛围", content: "开放式菜棚，江风拂面，在自然中享受热气腾腾的美味。" }
+                    ]
+                },
+                {
+                    title: "溪流烧烤", subtitle: "山林间的松弛盛宴，回归野趣本真", image: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&q=80&w=1000",
+                    tags: ["依山傍水", "特色烤品", "民俗演艺", "多元场景"],
+                    desc: "依托琵岩山溪流资源，打造天然石滩烧烤区。滋滋作响的烤五花肉、烤明太鱼，伴随现场民谣演奏与传统鼓乐，边烧烤边互动。",
+                    details: [
+                        { title: "依山傍水", content: "依托琵岩山溪流资源，打造天然石滩烧烤区，实现“逐水而食、伴山而栖”的独特体验。" },
+                        { title: "特色烤品", content: "滋滋作响的烤五花肉、风味独特的烤明太鱼与本地烤苹果梨。" },
+                        { title: "多元场景", content: "涵盖亲子游乐、情侣私密帐篷、团建篝火晚会三大专属场景。" },
+                        { title: "民俗演艺", content: "现场民谣演奏与传统鼓乐，边烧烤边互动，沉浸朝鲜族文化氛围。" }
+                    ]
+                }
+            ];
+
+            const audiences = [
+                { icon: <Icon name="Users" size={28} />, title: "亲子家庭", desc: "寓教于乐，亲近自然。体验采摘与手工的乐趣。" },
+                { icon: <Icon name="Heart" size={28} />, title: "情侣出游", desc: "浪漫独特，品质约会。私汤民宿与星空烧烤的浪漫。" },
+                { icon: <Icon name="Leaf" size={28} />, title: "康养旅居", desc: "身心放松，健康养生。偏硅酸温泉与森林氧吧的疗愈。" }
+            ];
+
+            return (
+                <div className="relative">
+                    {/* Toast */}
+                    <div className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-300 ${toast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+                        <div className="bg-emerald-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 font-medium">
+                            <Icon name="CheckCircle2" size={20} className="text-emerald-300" /> {toast}
+                        </div>
+                    </div>
+
+                    {/* Nav */}
+                    <nav className="fixed w-full bg-white/95 backdrop-blur-md shadow-sm z-50 border-b border-gray-100">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-20 items-center">
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({top: 0})}>
+                                <Icon name="MapPin" className="text-emerald-600" size={28} />
+                                <span className="font-bold text-2xl tracking-tight text-emerald-900">琵岩山文旅</span>
+                            </div>
+                            <div className="hidden md:flex space-x-8 font-medium text-gray-600">
+                                <a href="#about" className="hover:text-emerald-600 transition">核心定位</a>
+                                <a href="#features" className="hover:text-emerald-600 transition">四大特色</a>
+                                <button onClick={() => setAIAvatarModalOpen(true)} className="text-purple-600 hover:text-purple-800 transition flex items-center gap-1 font-bold animate-pulse">
+                                    <Icon name="Wand2" size={18} /> AI 换装
+                                </button>
+                            </div>
+                            <button onClick={() => setBookingModalOpen(true)} className="bg-emerald-700 text-white px-6 py-2.5 rounded-full font-medium hover:bg-emerald-800 transition flex items-center gap-2">
+                                <Icon name="Calendar" size={18} /> 立即预订
+                            </button>
+                        </div>
+                    </nav>
+
+                    {/* Hero */}
+                    <div className="relative pt-20 pb-32 lg:pt-32 lg:pb-48 overflow-hidden bg-emerald-950">
+                        <div className="absolute inset-0 z-0 opacity-40">
+                            <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=2000" alt="琵岩山风景" className="w-full h-full object-cover"/>
+                        </div>
+                        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 text-center lg:text-left">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-6 text-white text-sm">
+                                <SparkleIcon /> 全新文旅体验升级
+                            </div>
+                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold text-white leading-tight mb-6">自然与人文的<br className="hidden lg:block"/>美好相遇</h1>
+                            <p className="mt-4 text-lg md:text-xl text-gray-200 max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed font-light">泉韵民俗 · 森野食光。<br />沉浸式民俗体验 × 全季节康养度假 × 森野烟火美食。</p>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                                <a href="#features" className="bg-white text-emerald-900 px-8 py-3.5 rounded-full font-bold hover:bg-gray-100 transition shadow-xl flex items-center justify-center gap-2">
+                                    探索特色 <Icon name="ChevronRight" size={20} />
+                                </a>
+                                <button onClick={() => setInfoModalOpen(true)} className="border border-white/50 text-white bg-black/20 backdrop-blur-sm px-8 py-3.5 rounded-full font-bold hover:bg-white hover:text-emerald-900 transition flex items-center justify-center gap-2">
+                                    <Icon name="Info" size={20} /> 了解更多
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Pillars */}
+                    <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 lg:-mt-24 mb-20" id="about">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {corePillars.map((pillar, idx) => (
+                                <div key={idx} className="bg-white/95 backdrop-blur-xl rounded-2xl p-8 shadow-xl shadow-gray-200/50 border border-gray-100 hover:-translate-y-2 transition-transform duration-300">
+                                    <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
+                                        {pillar.icon}
+                                    </div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-3">{pillar.title}</h3>
+                                    <p className="text-gray-600 leading-relaxed">{pillar.desc}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Features */}
+                    <section className="py-24 bg-white" id="features">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="text-center mb-16">
+                                <h2 className="text-emerald-700 font-bold tracking-widest text-sm mb-3 uppercase">Features</h2>
+                                <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">四大核心特色</h3>
+                                <div className="h-1 w-20 bg-emerald-500 mx-auto rounded-full mb-6"></div>
+                            </div>
+                            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+                                <div className="w-full lg:w-[35%] flex flex-col gap-4">
+                                    {features.map((item, idx) => (
+                                        <button key={idx} onClick={() => handleFeatureTabClick(idx)} className={`text-left p-6 rounded-2xl transition-all duration-300 border-2 ${activeFeature === idx ? 'border-emerald-600 bg-emerald-50 shadow-md' : 'border-transparent bg-gray-50 hover:bg-gray-100'}`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className={`text-xl font-bold ${activeFeature === idx ? 'text-emerald-800' : 'text-gray-800'}`}>0{idx + 1}. {item.title}</h4>
+                                                {activeFeature === idx && <Icon name="ChevronRight" className="text-emerald-600" size={20} />}
+                                            </div>
+                                            <p className="text-sm text-gray-500 mt-2">{item.subtitle}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="w-full lg:w-[65%]" id="feature-content-display">
+                                    <div className="bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-100">
+                                        <div className="h-64 md:h-96 w-full relative">
+                                            <img key={activeFeature} src={features[activeFeature].image} alt={features[activeFeature].title} className="w-full h-full object-cover animate-fadeIn" />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 to-transparent"></div>
+                                            <div className="absolute bottom-8 left-8 right-8">
+                                                <h3 className="text-3xl font-bold text-white mb-4">{features[activeFeature].title}</h3>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {features[activeFeature].tags.map((tag, idx) => (
+                                                        <span key={idx} className="bg-white/20 backdrop-blur-md text-white px-3 py-1 rounded-full text-sm border border-white/30">{tag}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="p-8">
+                                            <p className="text-gray-700 text-lg leading-relaxed mb-6">{features[activeFeature].desc}</p>
+                                            <div className="flex flex-col sm:flex-row gap-4">
+                                                <button onClick={() => setDetailFeature(features[activeFeature])} className="bg-emerald-50 text-emerald-700 px-6 py-3 rounded-full font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition">
+                                                    查看项目详情 <Icon name="Info" size={18} />
+                                                </button>
+                                                <button onClick={() => setBookingModalOpen(true)} className="text-emerald-600 font-bold flex items-center justify-center gap-2 hover:text-emerald-800 transition">
+                                                    预订此体验套餐 <Icon name="ChevronRight" size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Footer */}
+                    <footer className="bg-gray-950 text-gray-400 py-16 border-t border-gray-900 mt-12">
+                        <div className="max-w-7xl mx-auto px-4 text-center">
+                            <p>© 2026 琵岩山生态文旅度假区. 保留所有权利.</p>
+                        </div>
+                    </footer>
+
+                    {/* Booking Modal */}
+                    {isBookingModalOpen && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBookingModalOpen(false)}></div>
+                            <div className="bg-white rounded-3xl w-full max-w-lg relative z-10 shadow-2xl p-6 animate-slideUp">
+                                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Icon name="Calendar" /> 在线预订行程</h3>
+                                <form onSubmit={handleBookingSubmit} className="space-y-4">
+                                    <input required type="text" className="w-full border rounded-xl px-4 py-3 bg-gray-50 focus:border-emerald-500 focus:outline-none" placeholder="您的姓名" />
+                                    <input required type="tel" className="w-full border rounded-xl px-4 py-3 bg-gray-50 focus:border-emerald-500 focus:outline-none" placeholder="联系电话" />
+                                    <input required type="date" className="w-full border rounded-xl px-4 py-3 bg-gray-50 focus:border-emerald-500 focus:outline-none" />
+                                    <button type="submit" className="w-full bg-emerald-600 text-white rounded-xl py-3.5 font-bold hover:bg-emerald-700 mt-2">确认提交预订</button>
+                                    <button type="button" onClick={() => setBookingModalOpen(false)} className="w-full text-gray-500 py-2">取消</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Feature Details Modal */}
+                    {detailFeature && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-8">
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDetailFeature(null)}></div>
+                            <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl animate-slideUp">
+                                <button onClick={() => setDetailFeature(null)} className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full z-20"><Icon name="X" size={24} /></button>
+                                <div className="h-64 relative w-full">
+                                    <img src={detailFeature.image} alt={detailFeature.title} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="p-6 md:p-10">
+                                    <h3 className="text-3xl font-bold mb-6">{detailFeature.title}</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                        {detailFeature.details.map((item, idx) => (
+                                            <div key={idx} className="bg-gray-50 p-4 rounded-xl border">
+                                                <h5 className="font-bold text-emerald-800 mb-2">{item.title}</h5>
+                                                <p className="text-sm text-gray-600">{item.content}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end gap-4">
+                                        {detailFeature.title === "朝鲜族民俗村" && (
+                                            <button onClick={() => { setDetailFeature(null); setAIAvatarModalOpen(true); }} className="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full font-bold flex items-center gap-2">
+                                                <Icon name="Wand2" size={18} /> 体验 AI 换装
+                                            </button>
+                                        )}
+                                        <button onClick={() => { setDetailFeature(null); setBookingModalOpen(true); }} className="px-8 py-3 bg-emerald-600 text-white rounded-full font-bold">立即预订</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Info Modal */}
+                    {isInfoModalOpen && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setInfoModalOpen(false)}></div>
+                            <div className="bg-white rounded-3xl w-full max-w-2xl relative z-10 shadow-2xl p-8 animate-slideUp">
+                                <h3 className="text-2xl font-bold mb-4">关于琵岩山文旅项目</h3>
+                                <p className="text-gray-600 mb-4 leading-relaxed">
+                                    琵岩山“泉韵民俗·森野食光” 是一项集生态康养、民俗体验、森野美食于一体的综合性文旅产品开发方案。
+                                    依托特有的高氟偏硅酸温泉和得天独厚的森林溪流资源，深度挖掘边境朝鲜族文化。
+                                </p>
+                                <button onClick={() => setInfoModalOpen(false)} className="w-full bg-gray-100 text-gray-800 py-3 rounded-xl font-bold mt-4">关闭</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* AI Avatar Modal */}
+                    {isAIAvatarModalOpen && (
+                        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => { if(!isGenerating) setAIAvatarModalOpen(false) }}></div>
+                            <div className="bg-white rounded-3xl w-full max-w-3xl relative z-10 shadow-2xl overflow-hidden animate-slideUp">
+                                <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-emerald-900 px-6 py-5 flex justify-between items-center text-white">
+                                    <h3 className="text-xl font-bold flex items-center gap-2"><Icon name="Wand2" size={20} className="text-purple-300" /> AI 换装体验 (DeepSeek)</h3>
+                                    {!isGenerating && <button onClick={() => { setAIAvatarModalOpen(false); resetAI(); }} className="hover:bg-white/20 p-1 rounded-full"><Icon name="X" size={24} /></button>}
+                                </div>
+                                <div className="p-6 md:p-8 bg-gray-50 min-h-[450px] flex flex-col items-center justify-center">
+                                    {!uploadedImage ? (
+                                        <label className="flex flex-col items-center justify-center w-full max-w-md h-72 border-2 border-dashed border-purple-300 rounded-3xl cursor-pointer bg-white hover:bg-purple-50 transition-colors shadow-sm">
+                                            <div className="text-purple-600 mb-4"><Icon name="Camera" size={40} /></div>
+                                            <p className="text-xl font-bold">点击上传正面照片</p>
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                                        </label>
+                                    ) : isGenerating ? (
+                                        <div className="text-center">
+                                            <div className="w-32 h-32 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mx-auto mb-6"></div>
+                                            <h4 className="text-2xl font-bold text-gray-800">DeepSeek 视觉大模型处理中...</h4>
+                                        </div>
+                                    ) : generatedImage ? (
+                                        <div className="w-full">
+                                            <div className="grid grid-cols-2 gap-4 md:gap-8 mb-8">
+                                                <div>
+                                                    <span className="block mb-2 font-bold text-center">原图</span>
+                                                    <img src={uploadedImage} alt="Original" className="w-full h-48 md:h-64 object-cover rounded-2xl filter blur-[2px]" />
+                                                </div>
+                                                <div>
+                                                    <span className="block mb-2 font-bold text-center text-purple-600">DeepSeek 生成结果</span>
+                                                    <img src={generatedImage} alt="Generated" className="w-full h-48 md:h-64 object-cover rounded-2xl shadow-lg border-4 border-purple-200" />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-center gap-4">
+                                                <button onClick={resetAI} className="px-8 py-3 border border-gray-300 rounded-full bg-white">重试</button>
+                                                <button onClick={() => showToast('已保存！')} className="px-8 py-3 bg-purple-600 text-white rounded-full font-bold">下载保存</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center">
+                                            <img src={uploadedImage} alt="Preview" className="w-48 h-48 rounded-full object-cover mx-auto mb-6 border-4 border-white shadow-xl" />
+                                            <div className="flex gap-4 justify-center">
+                                                <button onClick={() => setUploadedImage(null)} className="px-8 py-3 border border-gray-300 rounded-full bg-white">重选</button>
+                                                <button onClick={handleGenerateAI} className="px-8 py-3 bg-emerald-600 text-white rounded-full font-bold flex items-center gap-2"><Icon name="Wand2" size={18}/> 开始 AI 换装</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Floating AI Button */}
+                    <button onClick={() => setAIAvatarModalOpen(true)} className="fixed bottom-8 right-8 z-[90] bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 md:p-5 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center">
+                        <Icon name="Wand2" size={28} />
+                    </button>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
